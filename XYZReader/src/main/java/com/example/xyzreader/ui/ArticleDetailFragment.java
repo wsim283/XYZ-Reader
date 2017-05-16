@@ -16,7 +16,9 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.GregorianCalendar;
 
+import android.os.Build;
 import android.os.Bundle;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ShareCompat;
 import android.support.v7.graphics.Palette;
 import android.text.Html;
@@ -136,6 +138,7 @@ public class ArticleDetailFragment extends Fragment implements
         });
 
         mPhotoView = (ImageView) mRootView.findViewById(R.id.photo);
+
         mPhotoContainerView = mRootView.findViewById(R.id.photo_container);
 
         mStatusBarColorDrawable = new ColorDrawable(0);
@@ -242,6 +245,13 @@ public class ArticleDetailFragment extends Fragment implements
                                 Palette p = Palette.generate(bitmap, 12);
                                 mMutedColor = p.getDarkMutedColor(0xFF333333);
                                 mPhotoView.setImageBitmap(imageContainer.getBitmap());
+
+                                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                                    mPhotoView.setTransitionName(getString(R.string.poster_transition, mItemId));
+                                    Log.v("TESTSTS", mPhotoView.getTransitionName());
+                                    ActivityCompat.startPostponedEnterTransition(getActivity());
+                                }
+
                                 mRootView.findViewById(R.id.meta_bar)
                                         .setBackgroundColor(mMutedColor);
                                 updateStatusBar();
@@ -253,6 +263,8 @@ public class ArticleDetailFragment extends Fragment implements
 
                         }
                     });
+
+
         } else {
             mRootView.setVisibility(View.GONE);
             titleView.setText("N/A");

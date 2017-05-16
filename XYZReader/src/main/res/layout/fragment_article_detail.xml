@@ -24,7 +24,6 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:scaleType="centerCrop"
-                    android:transitionName="@string/poster_transition"
                      />
 
                 <View
@@ -88,7 +87,9 @@
                     android:textColor="@color/ltgray"
                     android:textColorLink="@color/theme_accent"
                     android:textSize="@dimen/detail_body_text_size"
-                    android:lineSpacingMultiplier="@fraction/detail_body_line_spacing_multiplier" />
+                    android:lineSpacingMultiplier="@fraction/detail_body_line_spacing_multiplier"
+                    android:maxLines="1"
+                    android:ellipsize="end"/>
 
             </com.example.xyzreader.ui.MaxWidthLinearLayout>
         </FrameLayout>

@@ -10,5 +10,5 @@
     <string name="up">Up</string>
 
 
-    <string name="poster_transition">poster transition</string>
+    <string name="poster_transition">poster transition%d</string>
 </resources>

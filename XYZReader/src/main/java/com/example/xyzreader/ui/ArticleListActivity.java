@@ -10,6 +10,7 @@ import android.content.Loader;
 import android.database.Cursor;
 import android.os.Build;
 import android.os.Bundle;
+
 import android.support.v4.app.ActivityOptionsCompat;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.ActionBarActivity;
@@ -152,7 +153,15 @@ public class ArticleListActivity extends ActionBarActivity implements
             view.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
+                    long itemId = getItemId(vh.getAdapterPosition());
                     if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP){
+
+
+                        //Since there is a ViewPager in the Detail Activity, we need to ensure that we are transiting the right image
+                        //Thankfully, we can set transition name to the views in code and we can distinguish each name with the "getItemId" method provided
+                        //This can be matched in the detail fragment as an argument with the containing ID is passed through
+                        vh.thumbnailView.setTransitionName(getString(R.string.poster_transition, itemId));
+                        Log.v("TESTSTS main",   vh.thumbnailView.getTransitionName());
                         Bundle bundleForTransition = ActivityOptionsCompat
                                 .makeSceneTransitionAnimation(
                                         articleListActivity,
@@ -160,11 +169,12 @@ public class ArticleListActivity extends ActionBarActivity implements
                                         vh.thumbnailView.getTransitionName())
                                 .toBundle();
                         startActivity(new Intent(Intent.ACTION_VIEW,
-                                ItemsContract.Items.buildItemUri(getItemId(vh.getAdapterPosition()))),
+                                ItemsContract.Items.buildItemUri(itemId)),
                                 bundleForTransition);
+
                     }else {
                         startActivity(new Intent(Intent.ACTION_VIEW,
-                                ItemsContract.Items.buildItemUri(getItemId(vh.getAdapterPosition()))));
+                                ItemsContract.Items.buildItemUri(itemId)));
                     }
                 }
             });

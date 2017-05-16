@@ -23,8 +23,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="@color/photo_placeholder"
-            android:scaleType="centerCrop"
-            android:transitionName="@string/poster_transition"/>
+            android:scaleType="centerCrop"/>
 
         <TextView
             android:id="@+id/article_title"
