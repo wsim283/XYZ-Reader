@@ -161,7 +161,7 @@ public class ArticleListActivity extends ActionBarActivity implements
                         //Thankfully, we can set transition name to the views in code and we can distinguish each name with the "getItemId" method provided
                         //This can be matched in the detail fragment as an argument with the containing ID is passed through
                         vh.thumbnailView.setTransitionName(getString(R.string.poster_transition, itemId));
-                        Log.v("TESTSTS main",   vh.thumbnailView.getTransitionName());
+                        Log.v(TAG,  vh.thumbnailView.getTransitionName());
                         Bundle bundleForTransition = ActivityOptionsCompat
                                 .makeSceneTransitionAnimation(
                                         articleListActivity,

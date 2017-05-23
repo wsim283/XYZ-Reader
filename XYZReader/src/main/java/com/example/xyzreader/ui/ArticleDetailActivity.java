@@ -12,6 +12,7 @@ import android.support.v13.app.FragmentStatePagerAdapter;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.view.ViewPager;
 import android.support.v7.app.ActionBarActivity;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,6 +21,9 @@ import android.view.WindowInsets;
 import com.example.xyzreader.R;
 import com.example.xyzreader.data.ArticleLoader;
 import com.example.xyzreader.data.ItemsContract;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * An activity representing a single Article detail screen, letting you swipe between articles.
@@ -121,7 +125,6 @@ public class ArticleDetailActivity extends ActionBarActivity
     public void onLoadFinished(Loader<Cursor> cursorLoader, Cursor cursor) {
         mCursor = cursor;
         mPagerAdapter.notifyDataSetChanged();
-
         // Select the start ID
         if (mStartId > 0) {
             mCursor.moveToFirst();
@@ -130,12 +133,16 @@ public class ArticleDetailActivity extends ActionBarActivity
                 if (mCursor.getLong(ArticleLoader.Query._ID) == mStartId) {
                     final int position = mCursor.getPosition();
                     mPager.setCurrentItem(position, false);
+                    Log.v("Test", "LoadFinished Called, position clicked:" + position);
+                    //ArticleDetailFragment fragment = (ArticleDetailFragment) mPagerAdapter.instantiateItem(mPager, position);
+                    //fragment.startAnimation();
                     break;
                 }
                 mCursor.moveToNext();
             }
             mStartId = 0;
         }
+
     }
 
     @Override
@@ -157,8 +164,11 @@ public class ArticleDetailActivity extends ActionBarActivity
     }
 
     private class MyPagerAdapter extends FragmentStatePagerAdapter {
+        FragmentManager fm;
+        int lastShownFragmentPos = 1;
         public MyPagerAdapter(FragmentManager fm) {
             super(fm);
+            this.fm = fm;
         }
 
         @Override
@@ -168,13 +178,17 @@ public class ArticleDetailActivity extends ActionBarActivity
             if (fragment != null) {
                 mSelectedItemUpButtonFloor = fragment.getUpButtonFloor();
                 updateUpButtonPosition();
+                //fragment.startAnimation();
+               Log.v("TEST", "setPrimaryItem called");
             }
         }
 
         @Override
         public Fragment getItem(int position) {
             mCursor.moveToPosition(position);
-            return ArticleDetailFragment.newInstance(mCursor.getLong(ArticleLoader.Query._ID));
+            Log.v("TEST", "getItem called position: " + position);
+            return ArticleDetailFragment.newInstance(mCursor.getLong(ArticleLoader.Query._ID), mStartId);
+
         }
 
         @Override

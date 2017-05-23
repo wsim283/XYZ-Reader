@@ -18,6 +18,7 @@ import java.util.GregorianCalendar;
 
 import android.os.Build;
 import android.os.Bundle;
+import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ShareCompat;
 import android.support.v7.graphics.Palette;
@@ -28,6 +29,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -76,9 +78,10 @@ public class ArticleDetailFragment extends Fragment implements
     public ArticleDetailFragment() {
     }
 
-    public static ArticleDetailFragment newInstance(long itemId) {
+    public static ArticleDetailFragment newInstance(long itemId,long clickedId) {
         Bundle arguments = new Bundle();
         arguments.putLong(ARG_ITEM_ID, itemId);
+        arguments.putLong("CLICKED_ID", clickedId);
         ArticleDetailFragment fragment = new ArticleDetailFragment();
         fragment.setArguments(arguments);
         return fragment;
@@ -115,7 +118,7 @@ public class ArticleDetailFragment extends Fragment implements
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
-            Bundle savedInstanceState) {
+                             Bundle savedInstanceState) {
         mRootView = inflater.inflate(R.layout.fragment_article_detail, container, false);
         mDrawInsetsFrameLayout = (DrawInsetsFrameLayout)
                 mRootView.findViewById(R.id.draw_insets_frame_layout);
@@ -139,6 +142,10 @@ public class ArticleDetailFragment extends Fragment implements
 
         mPhotoView = (ImageView) mRootView.findViewById(R.id.photo);
 
+
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
+            mPhotoView.setTransitionName(getString(R.string.poster_transition, mItemId));
+
         mPhotoContainerView = mRootView.findViewById(R.id.photo_container);
 
         mStatusBarColorDrawable = new ColorDrawable(0);
@@ -152,6 +159,7 @@ public class ArticleDetailFragment extends Fragment implements
                         .getIntent(), getString(R.string.action_share)));
             }
         });
+
 
         bindViews();
         updateStatusBar();
@@ -231,7 +239,7 @@ public class ArticleDetailFragment extends Fragment implements
                 // If date is before 1902, just show the string
                 bylineView.setText(Html.fromHtml(
                         outputFormat.format(publishedDate) + " by <font color='#ffffff'>"
-                        + mCursor.getString(ArticleLoader.Query.AUTHOR)
+                                + mCursor.getString(ArticleLoader.Query.AUTHOR)
                                 + "</font>"));
 
             }
@@ -245,16 +253,22 @@ public class ArticleDetailFragment extends Fragment implements
                                 Palette p = Palette.generate(bitmap, 12);
                                 mMutedColor = p.getDarkMutedColor(0xFF333333);
                                 mPhotoView.setImageBitmap(imageContainer.getBitmap());
-
-                                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                                    mPhotoView.setTransitionName(getString(R.string.poster_transition, mItemId));
-                                    Log.v("TESTSTS", mPhotoView.getTransitionName());
-                                    ActivityCompat.startPostponedEnterTransition(getActivity());
-                                }
-
                                 mRootView.findViewById(R.id.meta_bar)
                                         .setBackgroundColor(mMutedColor);
                                 updateStatusBar();
+
+                                //The below allow us to start the image transition after the mPhotoView is ready.
+                                //Though it wouldn't know when the image is being loaded, it is better to start the transition
+                                //after the image has been loaded, which is done here
+                                mPhotoView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                                    @Override
+                                    public boolean onPreDraw() {
+                                        mPhotoView.getViewTreeObserver().removeOnPreDrawListener(this);
+                                        ActivityCompat.startPostponedEnterTransition(getActivity());
+                                        return true;
+                                    }
+                                });
+
                             }
                         }
 
@@ -263,6 +277,8 @@ public class ArticleDetailFragment extends Fragment implements
 
                         }
                     });
+
+
 
 
         } else {
