@@ -11,7 +11,9 @@ import android.database.Cursor;
 import android.os.Build;
 import android.os.Bundle;
 
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ActivityOptionsCompat;
+import android.support.v4.app.SharedElementCallback;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.ActionBarActivity;
 import android.support.v7.widget.GridLayoutManager;
@@ -26,6 +28,8 @@ import android.util.TypedValue;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.example.xyzreader.R;
@@ -37,6 +41,8 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.List;
+import java.util.Map;
 
 /**
  * An activity representing a list of Articles. This activity has different presentations for
@@ -57,6 +63,10 @@ public class ArticleListActivity extends ActionBarActivity implements
     private SimpleDateFormat outputFormat = new SimpleDateFormat();
     // Most time functions can only handle 1902 - 2037
     private GregorianCalendar START_OF_EPOCH = new GregorianCalendar(2,1,1);
+    private int clickedItemPos = -1;
+    private ImageView selectedThumbnailView = null;
+    private boolean isReturn = false;
+    private int endPosition = -1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,8 +75,39 @@ public class ArticleListActivity extends ActionBarActivity implements
 
         mToolbar = (Toolbar) findViewById(R.id.toolbar);
 
+        //After testing, this seems to get called whenever the transition is starting/returning.
+        //This also applies for setEnterSharedElementCallback in ArticleDetailActivity
+        //After researching the DOC, exitSharedElement is the element for the exit activity, in this case ArticleListActivity
+        //enterSharedElement is for the entering activity of the transition(ArticleDetailActivity)
+        //We need to modify the shared element because of cases when users swipe left or right.
+        //The fragment is no longer the same as the one we entered with and so we need to set the correct view to end the transition appropriately
+        ActivityCompat.setExitSharedElementCallback(this, new SharedElementCallback() {
+            @Override
+            public void onMapSharedElements(List<String> names, Map<String, View> sharedElements) {
 
-        final View toolbarContainerView = findViewById(R.id.toolbar_container);
+                //As mentioned, this callback gets triggered whenever the transition is starting/returning
+                //We only want to modify the element when it is returning AND the position has changed
+                if(isReturn) {
+                    if(endPosition != clickedItemPos) {
+                        mRecyclerView.scrollToPosition(endPosition);
+                        View endThumbnailView = (endPosition != -1)
+                                ? mRecyclerView.getLayoutManager().findViewByPosition(endPosition).findViewById(R.id.thumbnail)
+                                : null;
+
+                        if (endThumbnailView != null) {
+                            String transitionName = getString(R.string.poster_transition, mRecyclerView.getAdapter().getItemId(endPosition));
+                            names.clear();
+                            names.add(transitionName);
+                            sharedElements.clear();
+                            sharedElements.put(transitionName, endThumbnailView);
+                        }
+                    }
+                    //Set it back, otherwise we might modify it by accident when the user clicks another item
+                    isReturn = false;
+                }
+
+            }
+        });
 
         mSwipeRefreshLayout = (SwipeRefreshLayout) findViewById(R.id.swipe_refresh_layout);
 
@@ -131,6 +172,34 @@ public class ArticleListActivity extends ActionBarActivity implements
         mRecyclerView.setAdapter(null);
     }
 
+    /**
+     * We'll need to set up our transition when we return back to this activity
+     * @param resultCode
+     * @param data
+     */
+    @Override
+    public void onActivityReenter(int resultCode, Intent data) {
+        super.onActivityReenter(resultCode, data);
+
+        if(resultCode == RESULT_OK && selectedThumbnailView != null) {
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                isReturn = true;
+                endPosition = data.getIntExtra(getString(R.string.end_position_extra), -1);
+                ActivityCompat.postponeEnterTransition(this);
+                mRecyclerView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                    @Override
+                    public boolean onPreDraw() {
+                        mRecyclerView.getViewTreeObserver().removeOnPreDrawListener(this);
+                        ActivityCompat.startPostponedEnterTransition(ArticleListActivity.this);
+                        return true;
+                    }
+                });
+            }
+        }
+
+    }
+
+
     private class Adapter extends RecyclerView.Adapter<ViewHolder> {
         private Cursor mCursor;
         private ArticleListActivity articleListActivity;
@@ -153,7 +222,13 @@ public class ArticleListActivity extends ActionBarActivity implements
             view.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
-                    long itemId = getItemId(vh.getAdapterPosition());
+                    clickedItemPos = vh.getAdapterPosition();
+                    long itemId = getItemId(clickedItemPos);
+                    Intent detailIntent = new Intent(Intent.ACTION_VIEW,
+                            ItemsContract.Items.buildItemUri(itemId));
+
+                    detailIntent.putExtra(getString(R.string.start_position_extra), clickedItemPos);
+
                     if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP){
 
 
@@ -161,6 +236,7 @@ public class ArticleListActivity extends ActionBarActivity implements
                         //Thankfully, we can set transition name to the views in code and we can distinguish each name with the "getItemId" method provided
                         //This can be matched in the detail fragment as an argument with the containing ID is passed through
                         vh.thumbnailView.setTransitionName(getString(R.string.poster_transition, itemId));
+                        selectedThumbnailView = vh.thumbnailView;
                         Log.v(TAG,  vh.thumbnailView.getTransitionName());
                         Bundle bundleForTransition = ActivityOptionsCompat
                                 .makeSceneTransitionAnimation(
@@ -168,16 +244,15 @@ public class ArticleListActivity extends ActionBarActivity implements
                                         vh.thumbnailView,
                                         vh.thumbnailView.getTransitionName())
                                 .toBundle();
-                        startActivity(new Intent(Intent.ACTION_VIEW,
-                                ItemsContract.Items.buildItemUri(itemId)),
+                        startActivity(detailIntent,
                                 bundleForTransition);
 
                     }else {
-                        startActivity(new Intent(Intent.ACTION_VIEW,
-                                ItemsContract.Items.buildItemUri(itemId)));
+                        startActivity(detailIntent);
                     }
                 }
             });
+
             return vh;
         }
 

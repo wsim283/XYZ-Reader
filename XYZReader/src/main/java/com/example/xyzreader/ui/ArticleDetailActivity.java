@@ -3,6 +3,7 @@ package com.example.xyzreader.ui;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.LoaderManager;
+import android.content.Intent;
 import android.content.Loader;
 import android.database.Cursor;
 import android.graphics.drawable.ColorDrawable;
@@ -10,6 +11,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.support.v13.app.FragmentStatePagerAdapter;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.SharedElementCallback;
 import android.support.v4.view.ViewPager;
 import android.support.v7.app.ActionBarActivity;
 import android.util.Log;
@@ -22,8 +24,8 @@ import com.example.xyzreader.R;
 import com.example.xyzreader.data.ArticleLoader;
 import com.example.xyzreader.data.ItemsContract;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * An activity representing a single Article detail screen, letting you swipe between articles.
@@ -42,6 +44,10 @@ public class ArticleDetailActivity extends ActionBarActivity
     private MyPagerAdapter mPagerAdapter;
     private View mUpButtonContainer;
     private View mUpButton;
+    private int currentPos = -1;
+    private int startPos = -1;
+    private boolean isReturn = false;
+    private  ArticleDetailFragment currentlyShownFragment;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,7 +61,39 @@ public class ArticleDetailActivity extends ActionBarActivity
 
         ActivityCompat.postponeEnterTransition(this);
 
+
+        //Since we only want to manipulate the way the transition returns (because returning transition is screwed up if user swipes to diff fragment),
+        //we'll check for boolean isReturn,
+        //which is set to true at the end in finishAfterTransition()
+        //According to the DOC, this callback is set to the the Enter Activity, aka Launched Activity.
+        //For the Launching Activity, we need to use setExitSharedElementCallback instead
+        ActivityCompat.setEnterSharedElementCallback(this, new SharedElementCallback() {
+            @Override
+            public void onMapSharedElements(List<String> names, Map<String, View> sharedElements) {
+
+              if(isReturn && currentlyShownFragment != null){
+                  //if the user swipes the pager, we are no longer on the same starting fragment
+                  //this means we are not on the same fragment positioned from the start, so we will need to fix up our shared element values
+                 if(startPos != currentPos){
+                     mCursor.moveToPosition(currentPos);
+                    long itemId = mCursor.getLong(ArticleLoader.Query._ID);
+                     String transitionName = getString(R.string.poster_transition,itemId);
+                     String startTransitionName = getString(R.string.poster_transition,mStartId);
+                     names.clear();
+                     names.add(transitionName);
+                     sharedElements.remove(startTransitionName);
+                     sharedElements.put(transitionName, currentlyShownFragment.getView().findViewById(R.id.photo));
+                 }
+
+                 isReturn = false;
+              }
+
+            }
+        });
         setContentView(R.layout.activity_article_detail);
+
+
+        currentPos = getIntent().getIntExtra(getString(R.string.start_position_extra),-1);
 
         getLoaderManager().initLoader(0, null, this);
 
@@ -77,6 +115,7 @@ public class ArticleDetailActivity extends ActionBarActivity
 
             @Override
             public void onPageSelected(int position) {
+                currentPos = position;
                 if (mCursor != null) {
                     mCursor.moveToPosition(position);
                 }
@@ -116,6 +155,14 @@ public class ArticleDetailActivity extends ActionBarActivity
         }
     }
 
+
+    @Override
+    public void finishAfterTransition() {
+        isReturn = true;
+        setResult(RESULT_OK, new Intent().putExtra(getString(R.string.end_position_extra), currentPos));
+        super.finishAfterTransition();
+    }
+
     @Override
     public Loader<Cursor> onCreateLoader(int i, Bundle bundle) {
         return ArticleLoader.newAllArticlesInstance(this);
@@ -133,14 +180,12 @@ public class ArticleDetailActivity extends ActionBarActivity
                 if (mCursor.getLong(ArticleLoader.Query._ID) == mStartId) {
                     final int position = mCursor.getPosition();
                     mPager.setCurrentItem(position, false);
-                    Log.v("Test", "LoadFinished Called, position clicked:" + position);
-                    //ArticleDetailFragment fragment = (ArticleDetailFragment) mPagerAdapter.instantiateItem(mPager, position);
-                    //fragment.startAnimation();
                     break;
                 }
                 mCursor.moveToNext();
             }
             mStartId = 0;
+
         }
 
     }
@@ -165,7 +210,6 @@ public class ArticleDetailActivity extends ActionBarActivity
 
     private class MyPagerAdapter extends FragmentStatePagerAdapter {
         FragmentManager fm;
-        int lastShownFragmentPos = 1;
         public MyPagerAdapter(FragmentManager fm) {
             super(fm);
             this.fm = fm;
@@ -178,7 +222,9 @@ public class ArticleDetailActivity extends ActionBarActivity
             if (fragment != null) {
                 mSelectedItemUpButtonFloor = fragment.getUpButtonFloor();
                 updateUpButtonPosition();
-                //fragment.startAnimation();
+                //For transition, we need reference to the primary(current) fragment,
+                //so that we can access the ImageView that interacts with it.
+                currentlyShownFragment = fragment;
                Log.v("TEST", "setPrimaryItem called");
             }
         }
@@ -186,8 +232,7 @@ public class ArticleDetailActivity extends ActionBarActivity
         @Override
         public Fragment getItem(int position) {
             mCursor.moveToPosition(position);
-            Log.v("TEST", "getItem called position: " + position);
-            return ArticleDetailFragment.newInstance(mCursor.getLong(ArticleLoader.Query._ID), mStartId);
+            return ArticleDetailFragment.newInstance(mCursor.getLong(ArticleLoader.Query._ID));
 
         }
 
