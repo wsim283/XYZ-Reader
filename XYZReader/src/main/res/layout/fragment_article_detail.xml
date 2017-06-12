@@ -88,7 +88,7 @@
                     android:textColorLink="@color/theme_accent"
                     android:textSize="@dimen/detail_body_text_size"
                     android:lineSpacingMultiplier="@fraction/detail_body_line_spacing_multiplier"
-                    android:maxLines="1"
+                    android:maxLines="10"
                     android:ellipsize="end"/>
 
             </com.example.xyzreader.ui.MaxWidthLinearLayout>

@@ -88,11 +88,9 @@ public class ArticleListActivity extends ActionBarActivity implements
                 //As mentioned, this callback gets triggered whenever the transition is starting/returning
                 //We only want to modify the element when it is returning AND the position has changed
                 if(isReturn) {
-                    if(endPosition != clickedItemPos) {
-                        mRecyclerView.scrollToPosition(endPosition);
-                        View endThumbnailView = (endPosition != -1)
-                                ? mRecyclerView.getLayoutManager().findViewByPosition(endPosition).findViewById(R.id.thumbnail)
-                                : null;
+                    if(endPosition != clickedItemPos && endPosition != -1) {
+
+                        View endThumbnailView = mRecyclerView.getLayoutManager().findViewByPosition(endPosition).findViewById(R.id.thumbnail);
 
                         if (endThumbnailView != null) {
                             String transitionName = getString(R.string.poster_transition, mRecyclerView.getAdapter().getItemId(endPosition));
@@ -185,15 +183,19 @@ public class ArticleListActivity extends ActionBarActivity implements
             if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 isReturn = true;
                 endPosition = data.getIntExtra(getString(R.string.end_position_extra), -1);
-                ActivityCompat.postponeEnterTransition(this);
-                mRecyclerView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
-                    @Override
-                    public boolean onPreDraw() {
-                        mRecyclerView.getViewTreeObserver().removeOnPreDrawListener(this);
-                        ActivityCompat.startPostponedEnterTransition(ArticleListActivity.this);
-                        return true;
-                    }
-                });
+                if(endPosition!= -1) {
+                    mRecyclerView.scrollToPosition(endPosition);
+                }
+                    ActivityCompat.postponeEnterTransition(this);
+                    mRecyclerView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                        @Override
+                        public boolean onPreDraw() {
+                            mRecyclerView.getViewTreeObserver().removeOnPreDrawListener(this);
+                            ActivityCompat.startPostponedEnterTransition(ArticleListActivity.this);
+                            return true;
+                        }
+                    });
+
             }
         }
 
