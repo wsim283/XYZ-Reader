@@ -120,7 +120,7 @@ public class ArticleDetailActivity extends ActionBarActivity
                     mCursor.moveToPosition(position);
                 }
                 mSelectedItemId = mCursor.getLong(ArticleLoader.Query._ID);
-                updateUpButtonPosition();
+                //updateUpButtonPosition();
             }
         });
 
@@ -134,6 +134,7 @@ public class ArticleDetailActivity extends ActionBarActivity
             }
         });
 
+        /**
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             mUpButtonContainer.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
                 @Override
@@ -146,7 +147,7 @@ public class ArticleDetailActivity extends ActionBarActivity
                 }
             });
         }
-
+**/
         if (savedInstanceState == null) {
             if (getIntent() != null && getIntent().getData() != null) {
                 mStartId = ItemsContract.Items.getItemId(getIntent().getData());
@@ -199,14 +200,16 @@ public class ArticleDetailActivity extends ActionBarActivity
     public void onUpButtonFloorChanged(long itemId, ArticleDetailFragment fragment) {
         if (itemId == mSelectedItemId) {
             mSelectedItemUpButtonFloor = fragment.getUpButtonFloor();
-            updateUpButtonPosition();
+            //updateUpButtonPosition();
         }
     }
 
+    /**
     private void updateUpButtonPosition() {
         int upButtonNormalBottom = mTopInset + mUpButton.getHeight();
         mUpButton.setTranslationY(Math.min(mSelectedItemUpButtonFloor - upButtonNormalBottom, 0));
     }
+     **/
 
     private class MyPagerAdapter extends FragmentStatePagerAdapter {
         FragmentManager fm;
@@ -221,7 +224,7 @@ public class ArticleDetailActivity extends ActionBarActivity
             ArticleDetailFragment fragment = (ArticleDetailFragment) object;
             if (fragment != null) {
                 mSelectedItemUpButtonFloor = fragment.getUpButtonFloor();
-                updateUpButtonPosition();
+                //updateUpButtonPosition();
                 //For transition, we need reference to the primary(current) fragment,
                 //so that we can access the ImageView that interacts with it.
                 currentlyShownFragment = fragment;

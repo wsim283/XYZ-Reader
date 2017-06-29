@@ -4,10 +4,10 @@ import android.app.Fragment;
 import android.app.LoaderManager;
 import android.content.Intent;
 import android.content.Loader;
+import android.content.res.TypedArray;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.Color;
-import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 
@@ -18,11 +18,13 @@ import java.util.GregorianCalendar;
 
 import android.os.Build;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
+import android.support.design.widget.AppBarLayout;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ShareCompat;
 import android.support.v7.graphics.Palette;
+import android.support.v7.widget.Toolbar;
 import android.text.Html;
+import android.text.TextUtils;
 import android.text.format.DateUtils;
 import android.text.method.LinkMovementMethod;
 import android.util.Log;
@@ -70,6 +72,14 @@ public class ArticleDetailFragment extends Fragment implements
     private SimpleDateFormat outputFormat = new SimpleDateFormat();
     // Most time functions can only handle 1902 - 2037
     private GregorianCalendar START_OF_EPOCH = new GregorianCalendar(2,1,1);
+
+    private AppBarLayout appBarLayout;
+    private Toolbar toolbar;
+    private TextView titleView;
+    private int actionBarSize;
+    private boolean expandingStart = true;
+
+
 
     /**
      * Mandatory empty constructor for the fragment manager to instantiate the
@@ -119,34 +129,42 @@ public class ArticleDetailFragment extends Fragment implements
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         mRootView = inflater.inflate(R.layout.fragment_article_detail, container, false);
-        mDrawInsetsFrameLayout = (DrawInsetsFrameLayout)
-                mRootView.findViewById(R.id.draw_insets_frame_layout);
-        mDrawInsetsFrameLayout.setOnInsetsCallback(new DrawInsetsFrameLayout.OnInsetsCallback() {
-            @Override
-            public void onInsetsChanged(Rect insets) {
-                mTopInset = insets.top;
-            }
-        });
 
-        mScrollView = (ObservableScrollView) mRootView.findViewById(R.id.scrollview);
-        mScrollView.setCallbacks(new ObservableScrollView.Callbacks() {
-            @Override
-            public void onScrollChanged() {
-                mScrollY = mScrollView.getScrollY();
-                getActivityCast().onUpButtonFloorChanged(mItemId, ArticleDetailFragment.this);
-                mPhotoContainerView.setTranslationY((int) (mScrollY - mScrollY / PARALLAX_FACTOR));
-                updateStatusBar();
-            }
-        });
 
         mPhotoView = (ImageView) mRootView.findViewById(R.id.photo);
 
+        //we'll need to toolbar size (set at actionBarSize in our layout) so that we can use it to support scrolling behaviour in a collapsing toolbar
+        //default actionbar size differs tablet and phone screens
+        final TypedArray styledAttributes = getActivity().getTheme().obtainStyledAttributes(new int[]{android.R.attr.actionBarSize});
+        actionBarSize = (int)styledAttributes.getDimension(0,0);
+        styledAttributes.recycle();
 
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
             mPhotoView.setTransitionName(getString(R.string.poster_transition, mItemId));
 
-        mPhotoContainerView = mRootView.findViewById(R.id.photo_container);
+        toolbar = (Toolbar)mRootView.findViewById(R.id.meta_bar);
+        titleView = (TextView) mRootView.findViewById(R.id.article_title);
+        appBarLayout = (AppBarLayout)mRootView.findViewById(R.id.appBar);
+        //give some padding when the toolbar is collapsed (or close to collapsing) so that the Up button is not covered
+        //If not collapsed, remove the padding
+        appBarLayout.addOnOffsetChangedListener(new AppBarLayout.OnOffsetChangedListener() {
+            @Override
+            public void onOffsetChanged(AppBarLayout appBarLayout, int verticalOffset) {
+                int absVertOffset = Math.abs(verticalOffset);
+                int toolbarRange = appBarLayout.getTotalScrollRange() - actionBarSize;
+                if(absVertOffset >= toolbarRange){
 
+                    titleView.setPadding(getActivity().findViewById(R.id.action_up).getMeasuredWidth(),0,0,0);
+                    titleView.setEllipsize(TextUtils.TruncateAt.END);
+                    titleView.setMaxLines(1);
+                }else{
+
+                    titleView.setPadding(0,0,0,0);
+                    titleView.setMaxLines(2);
+                    titleView.setEllipsize(null);
+                }
+            }
+        });
         mStatusBarColorDrawable = new ColorDrawable(0);
 
         mRootView.findViewById(R.id.share_fab).setOnClickListener(new View.OnClickListener() {
@@ -177,7 +195,7 @@ public class ArticleDetailFragment extends Fragment implements
                     (int) (Color.blue(mMutedColor) * 0.9));
         }
         mStatusBarColorDrawable.setColor(color);
-        mDrawInsetsFrameLayout.setInsetBackground(mStatusBarColorDrawable);
+
     }
 
     static float progress(float v, float min, float max) {
@@ -210,7 +228,7 @@ public class ArticleDetailFragment extends Fragment implements
             return;
         }
 
-        TextView titleView = (TextView) mRootView.findViewById(R.id.article_title);
+
         TextView bylineView = (TextView) mRootView.findViewById(R.id.article_byline);
         bylineView.setMovementMethod(new LinkMovementMethod());
         TextView bodyView = (TextView) mRootView.findViewById(R.id.article_body);
@@ -230,16 +248,16 @@ public class ArticleDetailFragment extends Fragment implements
                                 publishedDate.getTime(),
                                 System.currentTimeMillis(), DateUtils.HOUR_IN_MILLIS,
                                 DateUtils.FORMAT_ABBREV_ALL).toString()
-                                + " by <font color='#ffffff'>"
+                                + " by <strong>"
                                 + mCursor.getString(ArticleLoader.Query.AUTHOR)
-                                + "</font>"));
+                                + "</strong>"));
 
             } else {
                 // If date is before 1902, just show the string
                 bylineView.setText(Html.fromHtml(
-                        outputFormat.format(publishedDate) + " by <font color='#ffffff'>"
+                        outputFormat.format(publishedDate) + " by <strong>"
                                 + mCursor.getString(ArticleLoader.Query.AUTHOR)
-                                + "</font>"));
+                                + "</strong>"));
 
             }
             bodyView.setText(Html.fromHtml(mCursor.getString(ArticleLoader.Query.BODY).replaceAll("(\r\n|\n)", "<br />")));
@@ -252,8 +270,6 @@ public class ArticleDetailFragment extends Fragment implements
                                 Palette p = Palette.generate(bitmap, 12);
                                 mMutedColor = p.getDarkMutedColor(0xFF333333);
                                 mPhotoView.setImageBitmap(imageContainer.getBitmap());
-                                mRootView.findViewById(R.id.meta_bar)
-                                        .setBackgroundColor(mMutedColor);
                                 updateStatusBar();
 
                                 //The below allow us to start the image transition after the mPhotoView is ready.
