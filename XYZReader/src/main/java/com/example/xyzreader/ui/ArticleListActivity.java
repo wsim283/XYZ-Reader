@@ -117,6 +117,12 @@ public class ArticleListActivity extends ActionBarActivity implements
         }
     }
 
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+
+
+    }
+
     private void refresh() {
         startService(new Intent(this, UpdaterService.class));
     }
@@ -179,7 +185,7 @@ public class ArticleListActivity extends ActionBarActivity implements
     public void onActivityReenter(int resultCode, Intent data) {
         super.onActivityReenter(resultCode, data);
 
-        if(resultCode == RESULT_OK && selectedThumbnailView != null) {
+        if(selectedThumbnailView != null) {
             if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 isReturn = true;
                 endPosition = data.getIntExtra(getString(R.string.end_position_extra), -1);

@@ -71,6 +71,7 @@ public class ArticleDetailActivity extends ActionBarActivity
             @Override
             public void onMapSharedElements(List<String> names, Map<String, View> sharedElements) {
 
+                Log.v("ArticleDetailActivity", "called");
               if(isReturn && currentlyShownFragment != null){
                   //if the user swipes the pager, we are no longer on the same starting fragment
                   //this means we are not on the same fragment positioned from the start, so we will need to fix up our shared element values
@@ -130,7 +131,7 @@ public class ArticleDetailActivity extends ActionBarActivity
         mUpButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                onSupportNavigateUp();
+               finishAfterTransition();
             }
         });
 
@@ -155,7 +156,6 @@ public class ArticleDetailActivity extends ActionBarActivity
             }
         }
     }
-
 
     @Override
     public void finishAfterTransition() {

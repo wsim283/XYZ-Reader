@@ -6,7 +6,7 @@
 
     <android.support.design.widget.AppBarLayout
         android:layout_width="match_parent"
-        android:layout_height="300dp"
+        android:layout_height="@dimen/detail_appbar_height"
         android:id="@+id/appBar">
         <android.support.design.widget.CollapsingToolbarLayout
             android:layout_width="match_parent"
@@ -77,15 +77,16 @@
             <TextView
                 android:id="@+id/article_body"
                 style="?android:attr/textAppearanceMedium"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginLeft="@dimen/detail_inner_horiz_margin"
                 android:layout_marginRight="@dimen/detail_inner_horiz_margin"
                 android:paddingBottom="@dimen/detail_body_bottom_margin"
                 android:textColorLink="@color/theme_accent"
+                android:layout_gravity="center_horizontal"
                 android:textSize="@dimen/detail_body_text_size"
                 android:lineSpacingMultiplier="@fraction/detail_body_line_spacing_multiplier"
-                android:maxLines="30"
+                android:maxLines="40"
                 android:ellipsize="end"
                 android:layout_marginTop="@dimen/detail_body_top_margin"/>
         </LinearLayout>
