@@ -98,12 +98,15 @@ public class ArticleListActivity extends ActionBarActivity implements
                         //if its still the same position then we don't really need to do anything since the sharedElements remain intact EXCEPT
                         //when there's a screen orientation, hence why this is crucial to fix transitions when orientation is altered
 
-                    RecyclerView.LayoutManager layoutManager = mRecyclerView.getLayoutManager();
-                    Log.v(TAG, "total number of items: " + layoutManager.getItemCount());
-                    View endThumbnailView = mRecyclerView.getLayoutManager().findViewByPosition(position).findViewById(R.id.thumbnail);
+                    //RecyclerView.LayoutManager layoutManager = mRecyclerView.getLayoutManager();
+                    //Log.v(TAG, "total number of items: " + layoutManager.getItemCount());
+                    //View endThumbnailView = mRecyclerView.getLayoutManager().findViewByPosition(position).findViewById(R.id.thumbnail);
+
+                    //ViewHolder currentVH = ((ViewHolder)mRecyclerView.findViewHolderForAdapterPosition(position));
+                    String transitionName = getString(R.string.poster_transition, mRecyclerView.getAdapter().getItemId(position));
+                    View endThumbnailView = mRecyclerView.findViewWithTag(transitionName);
 
                     if (endThumbnailView != null) {
-                        String transitionName = getString(R.string.poster_transition, mRecyclerView.getAdapter().getItemId(position));
                         names.clear();
                         names.add(transitionName);
                         sharedElements.clear();
@@ -119,8 +122,12 @@ public class ArticleListActivity extends ActionBarActivity implements
         mSwipeRefreshLayout = (SwipeRefreshLayout) findViewById(R.id.swipe_refresh_layout);
 
         mRecyclerView = (RecyclerView) findViewById(R.id.recycler_view);
-        getLoaderManager().initLoader(0, null, this);
 
+        //if(getLoaderManager().getLoader(0) != null){
+          //getLoaderManager().restartLoader(0, null, this);
+        //}else {
+            getLoaderManager().initLoader(0, null, this);
+        //}
         if (savedInstanceState == null) {
             refresh();
         }
@@ -129,6 +136,7 @@ public class ArticleListActivity extends ActionBarActivity implements
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
+
     }
 
     private void refresh() {
@@ -204,15 +212,7 @@ public class ArticleListActivity extends ActionBarActivity implements
                 }
 
                 Log.v(TAG, "re-entering list activity, endPosition" + endPosition);
-                    ActivityCompat.postponeEnterTransition(this);
-                    mRecyclerView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
-                        @Override
-                        public boolean onPreDraw() {
-                            mRecyclerView.getViewTreeObserver().removeOnPreDrawListener(this);
-                            ActivityCompat.startPostponedEnterTransition(ArticleListActivity.this);
-                            return true;
-                        }
-                    });
+
 
             }
 
@@ -310,6 +310,10 @@ public class ArticleListActivity extends ActionBarActivity implements
                     mCursor.getString(ArticleLoader.Query.THUMB_URL),
                     ImageLoaderHelper.getInstance(ArticleListActivity.this).getImageLoader());
             holder.thumbnailView.setAspectRatio(mCursor.getFloat(ArticleLoader.Query.ASPECT_RATIO));
+            String transitionName = getString(R.string.poster_transition, mRecyclerView.getAdapter().getItemId(position));
+            holder.thumbnailView.setTag(transitionName);
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
+            holder.thumbnailView.setTransitionName(transitionName);
         }
 
         @Override
