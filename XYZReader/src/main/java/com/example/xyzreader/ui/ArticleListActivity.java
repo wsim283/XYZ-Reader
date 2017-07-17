@@ -213,7 +213,16 @@ public class ArticleListActivity extends ActionBarActivity implements
 
                 Log.v(TAG, "re-entering list activity, endPosition" + endPosition);
 
-
+                //ActivityCompat.postponeEnterTransition(this);
+                mRecyclerView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                    @Override
+                    public boolean onPreDraw() {
+                        mRecyclerView.getViewTreeObserver().removeOnPreDrawListener(this);
+                        mRecyclerView.requestLayout();
+                        //ActivityCompat.startPostponedEnterTransition(ArticleListActivity.this);
+                        return true;
+                    }
+                });
             }
 
 
