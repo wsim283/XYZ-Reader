@@ -64,7 +64,6 @@ public class ArticleListActivity extends ActionBarActivity implements
     // Most time functions can only handle 1902 - 2037
     private GregorianCalendar START_OF_EPOCH = new GregorianCalendar(2,1,1);
     private int clickedItemPos = -1;
-    private ImageView selectedThumbnailView = null;
     private boolean isReturn = false;
     private int endPosition = -1;
 
@@ -88,17 +87,27 @@ public class ArticleListActivity extends ActionBarActivity implements
                 //As mentioned, this callback gets triggered whenever the transition is starting/returning
                 //We only want to modify the element when it is returning AND the position has changed
                 if(isReturn) {
+                    Log.v(TAG, "endPosition: " + endPosition);
+                    Log.v(TAG, "clickedItemPos: " + clickedItemPos);
+
+                    int position = clickedItemPos;
                     if(endPosition != clickedItemPos && endPosition != -1) {
 
-                        View endThumbnailView = mRecyclerView.getLayoutManager().findViewByPosition(endPosition).findViewById(R.id.thumbnail);
+                        position = endPosition;
+                    }
+                        //if its still the same position then we don't really need to do anything since the sharedElements remain intact EXCEPT
+                        //when there's a screen orientation, hence why this is crucial to fix transitions when orientation is altered
 
-                        if (endThumbnailView != null) {
-                            String transitionName = getString(R.string.poster_transition, mRecyclerView.getAdapter().getItemId(endPosition));
-                            names.clear();
-                            names.add(transitionName);
-                            sharedElements.clear();
-                            sharedElements.put(transitionName, endThumbnailView);
-                        }
+                    RecyclerView.LayoutManager layoutManager = mRecyclerView.getLayoutManager();
+                    Log.v(TAG, "total number of items: " + layoutManager.getItemCount());
+                    View endThumbnailView = mRecyclerView.getLayoutManager().findViewByPosition(position).findViewById(R.id.thumbnail);
+
+                    if (endThumbnailView != null) {
+                        String transitionName = getString(R.string.poster_transition, mRecyclerView.getAdapter().getItemId(position));
+                        names.clear();
+                        names.add(transitionName);
+                        sharedElements.clear();
+                        sharedElements.put(transitionName, endThumbnailView);
                     }
                     //Set it back, otherwise we might modify it by accident when the user clicks another item
                     isReturn = false;
@@ -119,8 +128,7 @@ public class ArticleListActivity extends ActionBarActivity implements
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
-
-
+        super.onSaveInstanceState(outState);
     }
 
     private void refresh() {
@@ -185,13 +193,17 @@ public class ArticleListActivity extends ActionBarActivity implements
     public void onActivityReenter(int resultCode, Intent data) {
         super.onActivityReenter(resultCode, data);
 
-        if(selectedThumbnailView != null) {
+
+
             if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 isReturn = true;
                 endPosition = data.getIntExtra(getString(R.string.end_position_extra), -1);
+                clickedItemPos = data.getIntExtra(getString(R.string.start_position_extra), -1);
                 if(endPosition!= -1) {
                     mRecyclerView.scrollToPosition(endPosition);
                 }
+
+                Log.v(TAG, "re-entering list activity, endPosition" + endPosition);
                     ActivityCompat.postponeEnterTransition(this);
                     mRecyclerView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
                         @Override
@@ -203,7 +215,7 @@ public class ArticleListActivity extends ActionBarActivity implements
                     });
 
             }
-        }
+
 
     }
 
@@ -244,7 +256,6 @@ public class ArticleListActivity extends ActionBarActivity implements
                         //Thankfully, we can set transition name to the views in code and we can distinguish each name with the "getItemId" method provided
                         //This can be matched in the detail fragment as an argument with the containing ID is passed through
                         vh.thumbnailView.setTransitionName(getString(R.string.poster_transition, itemId));
-                        selectedThumbnailView = vh.thumbnailView;
                         Log.v(TAG,  vh.thumbnailView.getTransitionName());
                         Bundle bundleForTransition = ActivityOptionsCompat
                                 .makeSceneTransitionAnimation(

@@ -13,4 +13,7 @@
     <string name="poster_transition">poster transition%d</string>
     <string name="start_position_extra">start position</string>
     <string name="end_position_extra">end position</string>
+
+    <string name="article_detail_end_position">article_detail_end_position</string>
+    <string name="article_detail_start_position">article_detail_start_position</string>
 </resources>

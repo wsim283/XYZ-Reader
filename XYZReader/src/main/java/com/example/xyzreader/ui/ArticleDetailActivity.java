@@ -71,12 +71,13 @@ public class ArticleDetailActivity extends ActionBarActivity
             @Override
             public void onMapSharedElements(List<String> names, Map<String, View> sharedElements) {
 
-                Log.v("ArticleDetailActivity", "called");
               if(isReturn && currentlyShownFragment != null){
+                  Log.v("ArticleDetailActivity", "transition triggered");
                   //if the user swipes the pager, we are no longer on the same starting fragment
                   //this means we are not on the same fragment positioned from the start, so we will need to fix up our shared element values
                  if(startPos != currentPos){
                      mCursor.moveToPosition(currentPos);
+                     Log.v("ArticleDetailActivity", " startPos: " + startPos);
                     long itemId = mCursor.getLong(ArticleLoader.Query._ID);
                      String transitionName = getString(R.string.poster_transition,itemId);
                      String startTransitionName = getString(R.string.poster_transition,mStartId);
@@ -95,6 +96,7 @@ public class ArticleDetailActivity extends ActionBarActivity
 
 
         currentPos = getIntent().getIntExtra(getString(R.string.start_position_extra),-1);
+        startPos = currentPos;
 
         getLoaderManager().initLoader(0, null, this);
 
@@ -154,14 +156,33 @@ public class ArticleDetailActivity extends ActionBarActivity
                 mStartId = ItemsContract.Items.getItemId(getIntent().getData());
                 mSelectedItemId = mStartId;
             }
+        }else{
+            if(savedInstanceState.containsKey(getString(R.string.article_detail_end_position))){
+                currentPos = savedInstanceState.getInt(getString(R.string.article_detail_end_position));
+                Log.v("ArticleDetailActivity","orientation changed, retrieved saved current position: " + currentPos);
+            }
+
+            if(savedInstanceState.containsKey(getString(R.string.article_detail_start_position))){
+                startPos = savedInstanceState.getInt(getString(R.string.article_detail_start_position));
+                Log.v("ArticleDetailActivity","orientation changed, retrieved saved start position: " + startPos);
+            }
         }
     }
 
     @Override
     public void finishAfterTransition() {
         isReturn = true;
-        setResult(RESULT_OK, new Intent().putExtra(getString(R.string.end_position_extra), currentPos));
+        Log.v("ArticleDetailActivity","finish after transition");
+        setResult(RESULT_OK, new Intent().putExtra(getString(R.string.end_position_extra), currentPos)
+        .putExtra(getString(R.string.start_position_extra), startPos));
         super.finishAfterTransition();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        outState.putInt(getString(R.string.article_detail_end_position), currentPos);
+        outState.putInt(getString(R.string.article_detail_start_position), startPos);
+        super.onSaveInstanceState(outState);
     }
 
     @Override
