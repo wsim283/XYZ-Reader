@@ -32,6 +32,7 @@ import android.view.ViewTreeObserver;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.example.xyzreader.GeneralUtil;
 import com.example.xyzreader.R;
 import com.example.xyzreader.data.ArticleLoader;
 import com.example.xyzreader.data.ItemsContract;
@@ -74,60 +75,16 @@ public class ArticleListActivity extends ActionBarActivity implements
 
         mToolbar = (Toolbar) findViewById(R.id.toolbar);
 
-        //After testing, this seems to get called whenever the transition is starting/returning.
-        //This also applies for setEnterSharedElementCallback in ArticleDetailActivity
-        //After researching the DOC, exitSharedElement is the element for the exit activity, in this case ArticleListActivity
-        //enterSharedElement is for the entering activity of the transition(ArticleDetailActivity)
-        //We need to modify the shared element because of cases when users swipe left or right.
-        //The fragment is no longer the same as the one we entered with and so we need to set the correct view to end the transition appropriately
-        ActivityCompat.setExitSharedElementCallback(this, new SharedElementCallback() {
-            @Override
-            public void onMapSharedElements(List<String> names, Map<String, View> sharedElements) {
+        ActivityCompat.setExitSharedElementCallback(this,new MyExitSharedElementCallback());
 
-                //As mentioned, this callback gets triggered whenever the transition is starting/returning
-                //We only want to modify the element when it is returning AND the position has changed
-                if(isReturn) {
-                    Log.v(TAG, "endPosition: " + endPosition);
-                    Log.v(TAG, "clickedItemPos: " + clickedItemPos);
-
-                    int position = clickedItemPos;
-                    if(endPosition != clickedItemPos && endPosition != -1) {
-
-                        position = endPosition;
-                    }
-                        //if its still the same position then we don't really need to do anything since the sharedElements remain intact EXCEPT
-                        //when there's a screen orientation, hence why this is crucial to fix transitions when orientation is altered
-
-                    //RecyclerView.LayoutManager layoutManager = mRecyclerView.getLayoutManager();
-                    //Log.v(TAG, "total number of items: " + layoutManager.getItemCount());
-                    //View endThumbnailView = mRecyclerView.getLayoutManager().findViewByPosition(position).findViewById(R.id.thumbnail);
-
-                    //ViewHolder currentVH = ((ViewHolder)mRecyclerView.findViewHolderForAdapterPosition(position));
-                    String transitionName = getString(R.string.poster_transition, mRecyclerView.getAdapter().getItemId(position));
-                    View endThumbnailView = mRecyclerView.findViewWithTag(transitionName);
-
-                    if (endThumbnailView != null) {
-                        names.clear();
-                        names.add(transitionName);
-                        sharedElements.clear();
-                        sharedElements.put(transitionName, endThumbnailView);
-                    }
-                    //Set it back, otherwise we might modify it by accident when the user clicks another item
-                    isReturn = false;
-                }
-
-            }
-        });
 
         mSwipeRefreshLayout = (SwipeRefreshLayout) findViewById(R.id.swipe_refresh_layout);
 
         mRecyclerView = (RecyclerView) findViewById(R.id.recycler_view);
 
-        //if(getLoaderManager().getLoader(0) != null){
-          //getLoaderManager().restartLoader(0, null, this);
-        //}else {
-            getLoaderManager().initLoader(0, null, this);
-        //}
+
+        getLoaderManager().initLoader(0, null, this);
+
         if (savedInstanceState == null) {
             refresh();
         }
@@ -203,27 +160,28 @@ public class ArticleListActivity extends ActionBarActivity implements
 
 
 
-            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                isReturn = true;
-                endPosition = data.getIntExtra(getString(R.string.end_position_extra), -1);
-                clickedItemPos = data.getIntExtra(getString(R.string.start_position_extra), -1);
-                if(endPosition!= -1) {
-                    mRecyclerView.scrollToPosition(endPosition);
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            isReturn = true;
+            endPosition = data.getIntExtra(getString(R.string.end_position_extra), -1);
+            clickedItemPos = data.getIntExtra(getString(R.string.start_position_extra), -1);
+            if(endPosition!= -1) {
+                mRecyclerView.scrollToPosition(endPosition);
+            }
+
+            Log.v(TAG, "re-entering list activity, endPosition" + endPosition);
+
+            ActivityCompat.postponeEnterTransition(this);
+            mRecyclerView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                @Override
+                public boolean onPreDraw() {
+                    mRecyclerView.getViewTreeObserver().removeOnPreDrawListener(this);
+                    mRecyclerView.requestLayout();
+                    ActivityCompat.startPostponedEnterTransition(ArticleListActivity.this);
+                    return true;
                 }
 
-                Log.v(TAG, "re-entering list activity, endPosition" + endPosition);
-
-                //ActivityCompat.postponeEnterTransition(this);
-                mRecyclerView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
-                    @Override
-                    public boolean onPreDraw() {
-                        mRecyclerView.getViewTreeObserver().removeOnPreDrawListener(this);
-                        mRecyclerView.requestLayout();
-                        //ActivityCompat.startPostponedEnterTransition(ArticleListActivity.this);
-                        return true;
-                    }
-                });
-            }
+            });
+        }
 
 
     }
@@ -232,6 +190,7 @@ public class ArticleListActivity extends ActionBarActivity implements
     private class Adapter extends RecyclerView.Adapter<ViewHolder> {
         private Cursor mCursor;
         private ArticleListActivity articleListActivity;
+        private final String LOG_TAG = Adapter.class.getSimpleName();
         public Adapter(Cursor cursor, ArticleListActivity articleListActivity) {
 
             mCursor = cursor;
@@ -312,8 +271,8 @@ public class ArticleListActivity extends ActionBarActivity implements
             } else {
                 holder.subtitleView.setText(Html.fromHtml(
                         outputFormat.format(publishedDate)
-                        + "<br/>" + " by "
-                        + mCursor.getString(ArticleLoader.Query.AUTHOR)));
+                                + "<br/>" + " by "
+                                + mCursor.getString(ArticleLoader.Query.AUTHOR)));
             }
             holder.thumbnailView.setImageUrl(
                     mCursor.getString(ArticleLoader.Query.THUMB_URL),
@@ -321,8 +280,9 @@ public class ArticleListActivity extends ActionBarActivity implements
             holder.thumbnailView.setAspectRatio(mCursor.getFloat(ArticleLoader.Query.ASPECT_RATIO));
             String transitionName = getString(R.string.poster_transition, mRecyclerView.getAdapter().getItemId(position));
             holder.thumbnailView.setTag(transitionName);
+            GeneralUtil.debugLog(LOG_TAG, "position: "+ position + "   transitionName: "+transitionName);
             if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
-            holder.thumbnailView.setTransitionName(transitionName);
+                holder.thumbnailView.setTransitionName(transitionName);
         }
 
         @Override
@@ -341,6 +301,50 @@ public class ArticleListActivity extends ActionBarActivity implements
             thumbnailView = (DynamicHeightNetworkImageView) view.findViewById(R.id.thumbnail);
             titleView = (TextView) view.findViewById(R.id.article_title);
             subtitleView = (TextView) view.findViewById(R.id.article_subtitle);
+        }
+    }
+
+
+    private class MyExitSharedElementCallback extends SharedElementCallback{
+
+        private final String LOG_TAG = MyExitSharedElementCallback.class.getSimpleName();
+
+        /**After testing, this seems to get called whenever the transition is starting/returning.
+        //This also applies for setEnterSharedElementCallback in ArticleDetailActivity
+        //After researching the DOC, exitSharedElement is the element for the exit activity, in this case ArticleListActivity
+        //enterSharedElement is for the entering activity of the transition(ArticleDetailActivity)
+        //We need to modify the shared element because of cases when users swipe left or right.
+        //The fragment is no longer the same as the one we entered with and so we need to set the correct view to end the transition appropriately
+         **/
+        @Override
+        public void onMapSharedElements(List<String> names, Map<String, View> sharedElements) {
+            //As mentioned, this callback gets triggered whenever the transition is starting/returning
+            //We only want to modify the element when it is returning AND the position has changed
+            if(isReturn) {
+
+                //position determines which item in the list that we need to apply the return transition
+                //if user didn't swipe anywhere in the detail activity then keep it at the same clicked item position
+                //else, set it to the correct item that the user swiped to
+                int position = clickedItemPos;
+                if(endPosition != clickedItemPos && endPosition != -1) {
+                    position = endPosition;
+                }
+
+                String transitionName = getString(R.string.poster_transition, mRecyclerView.getAdapter().getItemId(position));
+
+                GeneralUtil.debugLog(LOG_TAG, "position: "+ position + "   transitionName: "+transitionName);
+
+                View endThumbnailView = mRecyclerView.findViewWithTag(transitionName);
+
+                if (endThumbnailView != null) {
+                    names.clear();
+                    names.add(transitionName);
+                    sharedElements.clear();
+                    sharedElements.put(transitionName, endThumbnailView);
+                }
+                //Set it back, otherwise we might modify it by accident when the user clicks another item
+                isReturn = false;
+            }
         }
     }
 }
