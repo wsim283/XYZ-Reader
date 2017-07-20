@@ -11,6 +11,7 @@ import android.database.Cursor;
 import android.os.Build;
 import android.os.Bundle;
 
+import android.os.Handler;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ActivityOptionsCompat;
 import android.support.v4.app.SharedElementCallback;
@@ -83,6 +84,8 @@ public class ArticleListActivity extends ActionBarActivity implements
         mRecyclerView = (RecyclerView) findViewById(R.id.recycler_view);
 
 
+        GeneralUtil.debugLog(TAG, "onCreateCalled");
+
         getLoaderManager().initLoader(0, null, this);
 
         if (savedInstanceState == null) {
@@ -136,6 +139,7 @@ public class ArticleListActivity extends ActionBarActivity implements
 
     @Override
     public void onLoadFinished(Loader<Cursor> cursorLoader, Cursor cursor) {
+        GeneralUtil.debugLog(TAG, "onLoadFinished");
         Adapter adapter = new Adapter(cursor, this);
         adapter.setHasStableIds(true);
         mRecyclerView.setAdapter(adapter);
@@ -158,32 +162,32 @@ public class ArticleListActivity extends ActionBarActivity implements
     public void onActivityReenter(int resultCode, Intent data) {
         super.onActivityReenter(resultCode, data);
 
-
-
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             isReturn = true;
             endPosition = data.getIntExtra(getString(R.string.end_position_extra), -1);
             clickedItemPos = data.getIntExtra(getString(R.string.start_position_extra), -1);
-            if(endPosition!= -1) {
-                mRecyclerView.scrollToPosition(endPosition);
-            }
-
-            Log.v(TAG, "re-entering list activity, endPosition" + endPosition);
 
             ActivityCompat.postponeEnterTransition(this);
-            mRecyclerView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+            GeneralUtil.debugLog(TAG, "re-entering list activity, endPosition" + endPosition);
+
+            new Handler().postDelayed(new Runnable() {
                 @Override
-                public boolean onPreDraw() {
-                    mRecyclerView.getViewTreeObserver().removeOnPreDrawListener(this);
-                    mRecyclerView.requestLayout();
-                    ActivityCompat.startPostponedEnterTransition(ArticleListActivity.this);
-                    return true;
+                public void run() {
+                    if(endPosition != 1)
+                        mRecyclerView.scrollToPosition(endPosition);
+                    mRecyclerView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                        @Override
+                        public boolean onPreDraw() {
+                            mRecyclerView.getViewTreeObserver().removeOnPreDrawListener(this);
+                            mRecyclerView.requestLayout();
+                            ActivityCompat.startPostponedEnterTransition(ArticleListActivity.this);
+                            return true;
+                        }
+                    });
+
                 }
-
-            });
+            }, 100);
         }
-
-
     }
 
 
@@ -310,11 +314,11 @@ public class ArticleListActivity extends ActionBarActivity implements
         private final String LOG_TAG = MyExitSharedElementCallback.class.getSimpleName();
 
         /**After testing, this seems to get called whenever the transition is starting/returning.
-        //This also applies for setEnterSharedElementCallback in ArticleDetailActivity
-        //After researching the DOC, exitSharedElement is the element for the exit activity, in this case ArticleListActivity
-        //enterSharedElement is for the entering activity of the transition(ArticleDetailActivity)
-        //We need to modify the shared element because of cases when users swipe left or right.
-        //The fragment is no longer the same as the one we entered with and so we need to set the correct view to end the transition appropriately
+         //This also applies for setEnterSharedElementCallback in ArticleDetailActivity
+         //After researching the DOC, exitSharedElement is the element for the exit activity, in this case ArticleListActivity
+         //enterSharedElement is for the entering activity of the transition(ArticleDetailActivity)
+         //We need to modify the shared element because of cases when users swipe left or right.
+         //The fragment is no longer the same as the one we entered with and so we need to set the correct view to end the transition appropriately
          **/
         @Override
         public void onMapSharedElements(List<String> names, Map<String, View> sharedElements) {
