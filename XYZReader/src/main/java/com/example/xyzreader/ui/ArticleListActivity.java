@@ -1,6 +1,5 @@
 package com.example.xyzreader.ui;
 
-import android.app.ActivityOptions;
 import android.app.LoaderManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -8,29 +7,29 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.Loader;
 import android.database.Cursor;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Build;
 import android.os.Bundle;
 
 import android.os.Handler;
+import android.support.design.widget.CoordinatorLayout;
+import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ActivityOptionsCompat;
 import android.support.v4.app.SharedElementCallback;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.ActionBarActivity;
 import android.support.v7.widget.GridLayoutManager;
-import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
-import android.support.v7.widget.StaggeredGridLayoutManager;
 import android.support.v7.widget.Toolbar;
 import android.text.Html;
 import android.text.format.DateUtils;
 import android.util.Log;
-import android.util.TypedValue;
-import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
-import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.example.xyzreader.GeneralUtil;
@@ -55,10 +54,11 @@ import java.util.Map;
 public class ArticleListActivity extends ActionBarActivity implements
         LoaderManager.LoaderCallbacks<Cursor> {
 
-    private static final String TAG = ArticleListActivity.class.toString();
+    private static final String LOG_TAG = ArticleListActivity.class.toString();
     private Toolbar mToolbar;
     private SwipeRefreshLayout mSwipeRefreshLayout;
     private RecyclerView mRecyclerView;
+    private CoordinatorLayout coordinatorLayout;
 
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.sss");
     // Use default locale format
@@ -69,28 +69,26 @@ public class ArticleListActivity extends ActionBarActivity implements
     private boolean isReturn = false;
     private int endPosition = -1;
 
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_article_list);
 
         mToolbar = (Toolbar) findViewById(R.id.toolbar);
-
-        ActivityCompat.setExitSharedElementCallback(this,new MyExitSharedElementCallback());
-
-
+        coordinatorLayout = (CoordinatorLayout) findViewById(R.id.coordinatorLayout);
         mSwipeRefreshLayout = (SwipeRefreshLayout) findViewById(R.id.swipe_refresh_layout);
-
         mRecyclerView = (RecyclerView) findViewById(R.id.recycler_view);
 
 
-        GeneralUtil.debugLog(TAG, "onCreateCalled");
-
-        getLoaderManager().initLoader(0, null, this);
+        ActivityCompat.setExitSharedElementCallback(this, new MyExitSharedElementCallback());
+        getLoaderManager().initLoader(0, null, ArticleListActivity.this);
 
         if (savedInstanceState == null) {
             refresh();
         }
+
     }
 
     @Override
@@ -116,14 +114,45 @@ public class ArticleListActivity extends ActionBarActivity implements
         unregisterReceiver(mRefreshingReceiver);
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        final IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(getString(R.string.has_connection));
+        LocalBroadcastManager.getInstance(this).registerReceiver(mRefreshingReceiver, intentFilter);
+    }
+
     private boolean mIsRefreshing = false;
 
     private BroadcastReceiver mRefreshingReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
+
             if (UpdaterService.BROADCAST_ACTION_STATE_CHANGE.equals(intent.getAction())) {
+                mRecyclerView.setVisibility(View.VISIBLE);
+                mRecyclerView.setEnabled(true);
+                GeneralUtil.debugLog(LOG_TAG, "onReceive called");
                 mIsRefreshing = intent.getBooleanExtra(UpdaterService.EXTRA_REFRESHING, false);
                 updateRefreshingUI();
+            }else if(getString(R.string.has_connection).equals(intent.getAction())){
+                //Since the starter code already checks for connectivity in UpdaterService,
+                //we can use this same method and handles it by sending a broadcast.
+                //upon receive, we can then setup the offline message to our snackbar
+                //On top of that, we need to hide our recycler view in cases when the app was launched successfully before
+                //loss of connectivity. This is because it'll still load up the items due to androids cache (but without content)
+                //which still allows user to click the item which is not what we want
+                GeneralUtil.debugLog(LOG_TAG, "onReceive called, no connection detected");
+                mRecyclerView.setVisibility(View.INVISIBLE);
+                mRecyclerView.setEnabled(false);
+                Snackbar snackbar = Snackbar.make(coordinatorLayout, getString(R.string.no_internet_connection_msg), Snackbar.LENGTH_INDEFINITE);
+                snackbar.setAction(getString(R.string.retry_refresh), new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        refresh();
+                    }
+                });
+                snackbar.show();
             }
         }
     };
@@ -139,7 +168,7 @@ public class ArticleListActivity extends ActionBarActivity implements
 
     @Override
     public void onLoadFinished(Loader<Cursor> cursorLoader, Cursor cursor) {
-        GeneralUtil.debugLog(TAG, "onLoadFinished");
+        GeneralUtil.debugLog(LOG_TAG, "onLoadFinished");
         Adapter adapter = new Adapter(cursor, this);
         adapter.setHasStableIds(true);
         mRecyclerView.setAdapter(adapter);
@@ -168,8 +197,13 @@ public class ArticleListActivity extends ActionBarActivity implements
             clickedItemPos = data.getIntExtra(getString(R.string.start_position_extra), -1);
 
             ActivityCompat.postponeEnterTransition(this);
-            GeneralUtil.debugLog(TAG, "re-entering list activity, endPosition" + endPosition);
+            GeneralUtil.debugLog(LOG_TAG, "re-entering list activity, endPosition" + endPosition);
 
+            //Delays preDraw and scrollToPosition
+            //This is because during an orientation change in Detail Activity,
+            //the return transition fails to execute if the returning item is off-screen.
+            //Through tests/inspection, this is because the loader has not loaded the data in-time for the preDraw & scrollToPosition to occur
+            //Through tests/inspection, 100ms delay gives the most optimised result.
             new Handler().postDelayed(new Runnable() {
                 @Override
                 public void run() {
@@ -207,9 +241,12 @@ public class ArticleListActivity extends ActionBarActivity implements
             return mCursor.getLong(ArticleLoader.Query._ID);
         }
 
+
+
         @Override
         public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
             View view = getLayoutInflater().inflate(R.layout.list_item_article, parent, false);
+            GeneralUtil.debugLog(LOG_TAG, "onCreateViewHolder called");
             final ViewHolder vh = new ViewHolder(view);
             view.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -222,13 +259,6 @@ public class ArticleListActivity extends ActionBarActivity implements
                     detailIntent.putExtra(getString(R.string.start_position_extra), clickedItemPos);
 
                     if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP){
-
-
-                        //Since there is a ViewPager in the Detail Activity, we need to ensure that we are transiting the right image
-                        //Thankfully, we can set transition name to the views in code and we can distinguish each name with the "getItemId" method provided
-                        //This can be matched in the detail fragment as an argument with the containing ID is passed through
-                        vh.thumbnailView.setTransitionName(getString(R.string.poster_transition, itemId));
-                        Log.v(TAG,  vh.thumbnailView.getTransitionName());
                         Bundle bundleForTransition = ActivityOptionsCompat
                                 .makeSceneTransitionAnimation(
                                         articleListActivity,
@@ -252,8 +282,8 @@ public class ArticleListActivity extends ActionBarActivity implements
                 String date = mCursor.getString(ArticleLoader.Query.PUBLISHED_DATE);
                 return dateFormat.parse(date);
             } catch (ParseException ex) {
-                Log.e(TAG, ex.getMessage());
-                Log.i(TAG, "passing today's date");
+                Log.e(LOG_TAG, ex.getMessage());
+                Log.i(LOG_TAG, "passing today's date");
                 return new Date();
             }
         }
@@ -282,16 +312,19 @@ public class ArticleListActivity extends ActionBarActivity implements
                     mCursor.getString(ArticleLoader.Query.THUMB_URL),
                     ImageLoaderHelper.getInstance(ArticleListActivity.this).getImageLoader());
             holder.thumbnailView.setAspectRatio(mCursor.getFloat(ArticleLoader.Query.ASPECT_RATIO));
-            String transitionName = getString(R.string.poster_transition, mRecyclerView.getAdapter().getItemId(position));
-            holder.thumbnailView.setTag(transitionName);
-            GeneralUtil.debugLog(LOG_TAG, "position: "+ position + "   transitionName: "+transitionName);
+
+            String thumbnailTransitionName = getString(R.string.poster_transition, mRecyclerView.getAdapter().getItemId(position));
+            holder.thumbnailView.setTag(thumbnailTransitionName);
+
+            GeneralUtil.debugLog(LOG_TAG, "position: "+ position + "   transitionName: "+thumbnailTransitionName);
             if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
-                holder.thumbnailView.setTransitionName(transitionName);
+                holder.thumbnailView.setTransitionName(thumbnailTransitionName);
+
         }
 
         @Override
         public int getItemCount() {
-            return mCursor.getCount();
+            return (mCursor!=null)?mCursor.getCount():0;
         }
     }
 
@@ -307,7 +340,6 @@ public class ArticleListActivity extends ActionBarActivity implements
             subtitleView = (TextView) view.findViewById(R.id.article_subtitle);
         }
     }
-
 
     private class MyExitSharedElementCallback extends SharedElementCallback{
 
@@ -335,9 +367,7 @@ public class ArticleListActivity extends ActionBarActivity implements
                 }
 
                 String transitionName = getString(R.string.poster_transition, mRecyclerView.getAdapter().getItemId(position));
-
                 GeneralUtil.debugLog(LOG_TAG, "position: "+ position + "   transitionName: "+transitionName);
-
                 View endThumbnailView = mRecyclerView.findViewWithTag(transitionName);
 
                 if (endThumbnailView != null) {

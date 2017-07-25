@@ -16,4 +16,7 @@
 
     <string name="article_detail_end_position">article_detail_end_position</string>
     <string name="article_detail_start_position">article_detail_start_position</string>
+    <string name="has_connection">has connection</string>
+    <string name="no_internet_connection_msg"> No Internet Connection</string>
+    <string name="retry_refresh">retry</string>
 </resources>

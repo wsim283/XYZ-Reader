@@ -8,7 +8,8 @@ import android.util.Log;
 
 public class GeneralUtil {
 
-    static final boolean DEBUG = true;
+    //set to true to see log messages(only apply to my logs, not the one that came with the starter code)
+    private static final boolean DEBUG = false;
 
 
     public static void debugLog(String logTag, String logMsg){

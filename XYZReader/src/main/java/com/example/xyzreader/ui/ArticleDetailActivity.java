@@ -20,6 +20,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
 
+import com.example.xyzreader.GeneralUtil;
 import com.example.xyzreader.R;
 import com.example.xyzreader.data.ArticleLoader;
 import com.example.xyzreader.data.ItemsContract;
@@ -33,16 +34,12 @@ import java.util.Map;
 public class ArticleDetailActivity extends ActionBarActivity
         implements LoaderManager.LoaderCallbacks<Cursor> {
 
+    private final String LOG_TAG = ArticleDetailActivity.class.getSimpleName();
     private Cursor mCursor;
     private long mStartId;
 
-    private long mSelectedItemId;
-    private int mSelectedItemUpButtonFloor = Integer.MAX_VALUE;
-    private int mTopInset;
-
     private ViewPager mPager;
     private MyPagerAdapter mPagerAdapter;
-    private View mUpButtonContainer;
     private View mUpButton;
     private int currentPos = -1;
     private int startPos = -1;
@@ -58,40 +55,14 @@ public class ArticleDetailActivity extends ActionBarActivity
                             View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         }
 
-
         ActivityCompat.postponeEnterTransition(this);
-
 
         //Since we only want to manipulate the way the transition returns (because returning transition is screwed up if user swipes to diff fragment),
         //we'll check for boolean isReturn,
         //which is set to true at the end in finishAfterTransition()
         //According to the DOC, this callback is set to the the Enter Activity, aka Launched Activity.
         //For the Launching Activity, we need to use setExitSharedElementCallback instead
-        ActivityCompat.setEnterSharedElementCallback(this, new SharedElementCallback() {
-            @Override
-            public void onMapSharedElements(List<String> names, Map<String, View> sharedElements) {
-
-              if(isReturn && currentlyShownFragment != null){
-                  Log.v("ArticleDetailActivity", "transition triggered");
-                  //if the user swipes the pager, we are no longer on the same starting fragment
-                  //this means we are not on the same fragment positioned from the start, so we will need to fix up our shared element values
-                 if(startPos != currentPos){
-                     mCursor.moveToPosition(currentPos);
-                     Log.v("ArticleDetailActivity", " startPos: " + startPos);
-                    long itemId = mCursor.getLong(ArticleLoader.Query._ID);
-                     String transitionName = getString(R.string.poster_transition,itemId);
-                     String startTransitionName = getString(R.string.poster_transition,mStartId);
-                     names.clear();
-                     names.add(transitionName);
-                     sharedElements.remove(startTransitionName);
-                     sharedElements.put(transitionName, currentlyShownFragment.getView().findViewById(R.id.photo));
-                 }
-
-                 isReturn = false;
-              }
-
-            }
-        });
+        ActivityCompat.setEnterSharedElementCallback(this, new MyEnterSharedElementCallback());
         setContentView(R.layout.activity_article_detail);
 
 
@@ -122,12 +93,9 @@ public class ArticleDetailActivity extends ActionBarActivity
                 if (mCursor != null) {
                     mCursor.moveToPosition(position);
                 }
-                mSelectedItemId = mCursor.getLong(ArticleLoader.Query._ID);
-                //updateUpButtonPosition();
+
             }
         });
-
-        mUpButtonContainer = findViewById(R.id.up_container);
 
         mUpButton = findViewById(R.id.action_up);
         mUpButton.setOnClickListener(new View.OnClickListener() {
@@ -137,34 +105,19 @@ public class ArticleDetailActivity extends ActionBarActivity
             }
         });
 
-        /**
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            mUpButtonContainer.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
-                @Override
-                public WindowInsets onApplyWindowInsets(View view, WindowInsets windowInsets) {
-                    view.onApplyWindowInsets(windowInsets);
-                    mTopInset = windowInsets.getSystemWindowInsetTop();
-                    mUpButtonContainer.setTranslationY(mTopInset);
-                    updateUpButtonPosition();
-                    return windowInsets;
-                }
-            });
-        }
-**/
         if (savedInstanceState == null) {
             if (getIntent() != null && getIntent().getData() != null) {
                 mStartId = ItemsContract.Items.getItemId(getIntent().getData());
-                mSelectedItemId = mStartId;
             }
         }else{
             if(savedInstanceState.containsKey(getString(R.string.article_detail_end_position))){
                 currentPos = savedInstanceState.getInt(getString(R.string.article_detail_end_position));
-                Log.v("ArticleDetailActivity","orientation changed, retrieved saved current position: " + currentPos);
+                GeneralUtil.debugLog(LOG_TAG, "orientation changed, retrieved saved current position " + currentPos);
             }
 
             if(savedInstanceState.containsKey(getString(R.string.article_detail_start_position))){
                 startPos = savedInstanceState.getInt(getString(R.string.article_detail_start_position));
-                Log.v("ArticleDetailActivity","orientation changed, retrieved saved start position: " + startPos);
+                GeneralUtil.debugLog(LOG_TAG, "orientation changed, retrieved saved start position: " + startPos);
             }
         }
     }
@@ -172,7 +125,6 @@ public class ArticleDetailActivity extends ActionBarActivity
     @Override
     public void finishAfterTransition() {
         isReturn = true;
-        Log.v("ArticleDetailActivity","finish after transition");
         setResult(RESULT_OK, new Intent().putExtra(getString(R.string.end_position_extra), currentPos)
         .putExtra(getString(R.string.start_position_extra), startPos));
         super.finishAfterTransition();
@@ -218,20 +170,6 @@ public class ArticleDetailActivity extends ActionBarActivity
         mPagerAdapter.notifyDataSetChanged();
     }
 
-    public void onUpButtonFloorChanged(long itemId, ArticleDetailFragment fragment) {
-        if (itemId == mSelectedItemId) {
-            mSelectedItemUpButtonFloor = fragment.getUpButtonFloor();
-            //updateUpButtonPosition();
-        }
-    }
-
-    /**
-    private void updateUpButtonPosition() {
-        int upButtonNormalBottom = mTopInset + mUpButton.getHeight();
-        mUpButton.setTranslationY(Math.min(mSelectedItemUpButtonFloor - upButtonNormalBottom, 0));
-    }
-     **/
-
     private class MyPagerAdapter extends FragmentStatePagerAdapter {
         FragmentManager fm;
         public MyPagerAdapter(FragmentManager fm) {
@@ -244,12 +182,9 @@ public class ArticleDetailActivity extends ActionBarActivity
             super.setPrimaryItem(container, position, object);
             ArticleDetailFragment fragment = (ArticleDetailFragment) object;
             if (fragment != null) {
-                mSelectedItemUpButtonFloor = fragment.getUpButtonFloor();
-                //updateUpButtonPosition();
                 //For transition, we need reference to the primary(current) fragment,
                 //so that we can access the ImageView that interacts with it.
                 currentlyShownFragment = fragment;
-               Log.v("TEST", "setPrimaryItem called");
             }
         }
 
@@ -263,6 +198,32 @@ public class ArticleDetailActivity extends ActionBarActivity
         @Override
         public int getCount() {
             return (mCursor != null) ? mCursor.getCount() : 0;
+        }
+    }
+
+    private class MyEnterSharedElementCallback extends SharedElementCallback{
+
+        private final String LOG_TAG = MyEnterSharedElementCallback.class.getSimpleName();
+        @Override
+        public void onMapSharedElements(List<String> names, Map<String, View> sharedElements) {
+
+            if(isReturn && currentlyShownFragment != null){
+                GeneralUtil.debugLog(LOG_TAG, "transition triggered");
+                //if the user swipes the pager, we are no longer on the same starting fragment
+                //this means we are not on the same fragment positioned from the start, so we will need to fix up our shared element values
+                if(startPos != currentPos){
+                    mCursor.moveToPosition(currentPos);
+                    long itemId = mCursor.getLong(ArticleLoader.Query._ID);
+                    String transitionName = getString(R.string.poster_transition,itemId);
+                    String startTransitionName = getString(R.string.poster_transition,mStartId);
+                    names.clear();
+                    names.add(transitionName);
+                    sharedElements.remove(startTransitionName);
+                    sharedElements.put(transitionName, currentlyShownFragment.getView().findViewById(R.id.photo));
+                }
+
+                isReturn = false;
+            }
         }
     }
 }
